@@ -5,7 +5,7 @@
 ** Receiver description: 
  * Given a connection type, it sets up the according socket, and waits for a connection from a transmitter. The transmitter will send data to the Receiver, with the Receiver will read into an output file. 
 ** Receiver input:
- * Receiver takes in 1 command-line argument, a case-insensitive string of either "DGRAM" or "STREAM", which will specify which socket type to use. Inputting "DGRAM" will construct a datagram socket to set up a UDP connection. Inputting "STREAM" will construct a byte stream socket to set up a TCP connection.
+ * Receiver takes in 1 command-line argument,f a case-insensitive string of either "DGRAM" or "STREAM", which will specify which socket type to use. Inputting "DGRAM" will construct a datagram socket to set up a UDP connection. Inputting "STREAM" will construct a byte stream socket to set up a TCP connection.
 ** Receiver output: 
  * Receiver returns the int 0 for successful socket setup and transmission of data, and a nonzero integer otherwise. An output file made from the received data will be constructed and contained in the same directory that the Receiver is in. 
 */
@@ -64,7 +64,7 @@ int main (int argc, char *argv[]) {
     
     //Declare variables used only in the UDP connection
     uint32_t packet_header;
-    uint32_t header_host_num;
+    uint8_t header_host_num;
     int ack_msg = 1;
     int ack_msg_byte; 
     connection_option = argv[1];
@@ -74,7 +74,7 @@ int main (int argc, char *argv[]) {
     
     //Declare variables for getting the arrival time of packets for the UDP connection
     struct timeval current_time;
-    suseconds_t delta_time, cumulative_delta = 0;
+    suseconds_t delta_time, cumulative_delta = 0;suseconds_t max_delta_time=0;
     suseconds_t arrival_time_1, arrival_time_2 = 0;
     suseconds_t avg_arrival_time;
     int receive_count;
@@ -104,6 +104,9 @@ int main (int argc, char *argv[]) {
         perror("Unable to create socket for the Receiver\n");
         return 2; 
     }
+    
+    //int disable = 0;
+    //setsockopt(sockfd, SOL_SOCKET, SO_UDPCKSUM_IN, &disable, sizeof(int));
     
     //Allow for reuse of port immediately, as soon as the service exits.
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
@@ -184,16 +187,23 @@ int main (int argc, char *argv[]) {
                 delta_time = arrival_time_1 - arrival_time_2;
                 cumulative_delta += delta_time;
                 printf("delta time is %d\n cumulative delta is %d\n", (int)delta_time, (int)cumulative_delta);
-
+                if (delta_time>max_delta_time)max_delta_time=delta_time;
             }
+                if ((uint8_t)buffer[1] == (uint8_t)receive_count)
+                    printf("same\n");
+                else
+                    printf("different\n");
+                printf("%d %d\n", (uint8_t)buffer[1] , (uint8_t)receive_count);
+
             receive_count++;
             arrival_time_2 = arrival_time_1;
             
             memcpy((void *)&packet_header, &buffer[0], 4);
-            header_host_num = ntohl(packet_header);
+            //header_host_num = ntohl(packet_header);
+            header_host_num = ntohl((uint32_t)buffer[0]);printf("header_host_num: %x\n",buffer[0] );
             printf("Receiving %d bytes\n", (int)num_from_remote);
             
-            if (header_host_num == 0xdeadbeef) {
+            if (/*header_host_num*/(uint8_t)buffer[0] == 0xFF) {
                 //header_host_num = 0xdeadbeef, reached end of file transfer
                 fclose(file_to_write);
                 printf("Reached end of file, total number of packets received: %d\n", total_bytes_read);
@@ -201,6 +211,7 @@ int main (int argc, char *argv[]) {
                 printf("Final receive count: %d\n", receive_count);
                 avg_arrival_time =cumulative_delta / receive_count;
                 printf("Average delay difference btwn individual packets: %d microseconds\n", (int)avg_arrival_time);
+                printf(" max_delta_time is %d", (int)max_delta_time);
                 close(sockfd);
                 return 0;
             }

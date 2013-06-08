@@ -120,8 +120,8 @@ static const uint8_t FrameSize2C[4] =
 
   //Declare variables used in UDP file transfer only
   int packet_counter;
-  uint32_t HEADER = 0xaaaaaaaa;
-  uint32_t MAGICNUM = 0xdeadbeef;
+  uint8_t HEADER = 0xAA;
+  uint8_t MAGICNUM = 0xFF;
   int last_packet;
 
 
@@ -136,28 +136,35 @@ int load_frame(){
   }
   else if (cfidc>0)
     {
-      uint32_t HEADER_netorder = htonl(HEADER);
+      uint8_t fnum = (uint8_t)frame*3;
+      uint8_t HEADER_netorder = 0xAA;//htonl(HEADER);
       memcpy(&buffer[0], (void *)&HEADER_netorder, (size_t)sizeof HEADER);
+      memcpy(&buffer[1], (void *)&fnum, (size_t)sizeof fnum);
       sendto(sockfd, buffer_beg_ptr, cnt+4, 0, receiver_info->ai_addr, receiver_info->ai_addrlen);
+      usleep(20);
       if(!sp) {
         cnt = fread(buffer_data_ptr, 1, height * width / SubSizeC[cfidc], fpointer);//printf("U-len=%d ",strlen(cb_data));//printf("cb_data\n");for(i=0; i<height * width / SubSizeC[cfidc];i++)printf("%x",cb_data[i]);
           // fprintf(stderr,"read %d cb bytes\n", cnt);
         if(cnt < width * height / 4){
         	return 0;
-        } else {
+        } else {fnum++;
 
-            uint32_t HEADER_netorder = htonl(HEADER);
+            uint8_t HEADER_netorder = 0xAA;//htonl(HEADER);
             memcpy(&buffer[0], (void *)&HEADER_netorder, (size_t)sizeof HEADER);
+            memcpy(&buffer[1], (void *)&fnum, (size_t)sizeof fnum);
             sendto(sockfd, buffer_beg_ptr, cnt+4, 0, receiver_info->ai_addr, receiver_info->ai_addrlen);
+            usleep(20);
 
             cnt = fread(buffer_data_ptr, 1, height * width / SubSizeC[cfidc], fpointer);//printf("V-len=%d\n",strlen(cr_data));//printf("cr_data\n");for(i=0; i<height * width / SubSizeC[cfidc];i++)printf("%x",cr_data[i]);
             // fprintf(stderr,"read %d cr bytes\n", cnt);
             if(cnt < width * height / 4){
                 return 0;
-            } else {
-              uint32_t HEADER_netorder = htonl(HEADER);
+            } else {fnum++;
+              uint8_t HEADER_netorder = 0xAA;//htonl(HEADER);
               memcpy(&buffer[0], (void *)&HEADER_netorder, (size_t)sizeof HEADER);
+              memcpy(&buffer[1], (void *)&fnum, (size_t)sizeof fnum);
               sendto(sockfd, buffer_beg_ptr, cnt+4, 0, receiver_info->ai_addr, receiver_info->ai_addrlen);
+              usleep(20);
             }
         }
       } else {
@@ -515,7 +522,7 @@ int socket_setting(){
 void send_end_signal()
 {
     //Once we've reached the end (bytes_left = 0), we send out a last packet with the hex header oxDEADBEEF to let the receiver know that we are done.
-    uint32_t MAGICNUM_netorder = htonl(MAGICNUM);
+    uint8_t MAGICNUM_netorder = 0xFF;//htonl(MAGICNUM);
     memcpy(&buffer[0], (void *)&MAGICNUM_netorder, (size_t)sizeof MAGICNUM);
     last_packet = sendto(sockfd, buffer_beg_ptr, MAXDATASIZE, 0, receiver_info->ai_addr, receiver_info->ai_addrlen);
     close(sockfd);
